@@ -7,6 +7,9 @@ using Microsoft.Extensions.Logging;
 
 namespace ADIA.AzureIa.Proxy.Services;
 
+/// <summary>
+/// Clase para extraer el texto de un archivo pdf
+/// </summary>
 public class AnalysisPdfAzureAIService : IAnalysisPdfAzureAIService
 {
     private readonly AzureIaConfig _azureIaConfig;
@@ -38,16 +41,6 @@ public class AnalysisPdfAzureAIService : IAnalysisPdfAzureAIService
         }
         response.End = DateTime.Now;
         return response;
-    }
-
-    private async Task<string> PerformAnalysisAsync(byte[] pdfFile)
-    {
-        var textResults = await AnalyzeTextWithComputerVisionAsync(pdfFile);
-        if (!textResults.Any())
-        {
-            throw new InvalidOperationException("No text found in PDF.");
-        }
-        return string.Join("\n", textResults);
     }
 
     private async Task<List<string>> AnalyzeTextWithComputerVisionAsync(byte[] fileData)

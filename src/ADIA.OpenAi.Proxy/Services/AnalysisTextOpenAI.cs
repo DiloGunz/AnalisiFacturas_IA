@@ -8,6 +8,9 @@ using OpenAI_API.Models;
 
 namespace ADIA.OpenAi.Proxy.Services;
 
+/// <summary>
+/// Clase para analizar el texto obtenido de azure IA
+/// </summary>
 public class AnalysisTextOpenAI : IAnalysisTextOpenAI
 {
     private readonly OpenIaConfig _openIaConfig;

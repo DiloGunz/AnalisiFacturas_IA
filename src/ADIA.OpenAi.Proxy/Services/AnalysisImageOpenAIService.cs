@@ -4,11 +4,13 @@ using ADIA.OpenAi.Proxy.Utils;
 using Microsoft.Extensions.Logging;
 using OpenAI_API;
 using OpenAI_API.Models;
-using System.Diagnostics.Contracts;
 using static OpenAI_API.Chat.ChatMessage;
 
 namespace ADIA.OpenAi.Proxy.Services;
 
+/// <summary>
+/// Clase para analizar una imagen usando api de OpenAI
+/// </summary>
 public class AnalysisImageOpenAIService : IAnalysisImageOpenAIService
 {
     private readonly OpenIaConfig _openIaConfig;
