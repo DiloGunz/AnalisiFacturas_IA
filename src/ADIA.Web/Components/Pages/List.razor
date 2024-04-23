@@ -1,0 +1,104 @@
+﻿@page "/List"
+@using ADIA.Model.DataTransfer.Dtos.AnalysisDtos
+@using ADIA.Model.DataTransfer.Queries
+@using ADIA.Shared.Collection
+@using ADIA.Web.Utils
+@inject IJSRuntime JS
+@inject MediatR.IMediator _mediator
+@rendermode InteractiveServer
+
+<PageTitle>Lista de Analisis</PageTitle>
+
+<h1>Lista de Análisis</h1>
+
+<Row>
+    <Column ColumnSize="ColumnSize.Is6">
+        <Field>
+            <FieldLabel >Criterio</FieldLabel>
+            <TextEdit @ref="_txtSearch" Placeholder="Buscar..." />
+        </Field>
+    </Column>
+    <Column ColumnSize="ColumnSize.Is3">
+        <Field>
+            <FieldLabel>Desde</FieldLabel>
+            <DatePicker @ref="_dpFrom" Date="DateTime.Now.AddDays(-10)" />
+        </Field>
+    </Column>
+    <Column ColumnSize="ColumnSize.Is3">
+        <Field>
+            <FieldLabel>Hasta</FieldLabel>
+            <DatePicker @ref="_dpTo" Date="DateTime.Now" />
+        </Field>
+    </Column>
+</Row>
+
+<Row>
+    <Field Flex="Flex.JustifyContent.Between">
+        <Button Color="Color.Success" Clicked="@Filter">Buscar</Button>
+        <Div>
+            <Button Color="Color.Primary" Clicked="@ExporExcel" Position="Position.Sticky.End">Exportar Excel</Button>
+        </Div>
+    </Field>
+    
+</Row>
+
+<Row>
+    <_ListAnalysis _pagedList="_analysisPagedDtos" SelectedPageEvent="SearchAsync" />
+</Row>
+
+
+@code {
+    private DataCollection<AnalysisListDto> _analysisPagedDtos = new DataCollection<AnalysisListDto>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var query = new GetAnalysisPagedQuery();
+        _analysisPagedDtos = await _mediator.Send(query);
+    }
+
+    private TextEdit _txtSearch;
+    private DatePicker<DateTime> _dpFrom;
+    private DatePicker<DateTime> _dpTo;
+
+    public async Task Filter()
+    {
+        await SearchAsync();
+    }
+
+    public async Task SearchAsync(int page = 1)
+    {
+        var query = new GetAnalysisPagedQuery()
+            {
+                Page = page,
+                PageSize = 10,
+                DtFrom = _dpFrom.Date,
+                DtTo = _dpTo.Date,
+                SearchString = _txtSearch.Text
+            };
+
+        _analysisPagedDtos = await _mediator.Send(query);
+    }
+
+    public async Task ExporExcel()
+    {
+        var query = new GetAnalysisListQuery()
+            {
+                DtFrom = _dpFrom.Date,
+                DtTo = _dpTo.Date,
+                SearchString = _txtSearch.Text
+            };
+
+        var data = await _mediator.Send(query);
+
+        if (data.Any())
+        {
+            var streamExcel = data.AnalysisToExcel();
+            streamExcel.Position = 0;
+            var buffer = new byte[streamExcel.Length];
+            await streamExcel.ReadAsync(buffer, 0, buffer.Length);
+            var base64String = Convert.ToBase64String(buffer);
+
+            await JS.InvokeVoidAsync("downloadFromBase64", base64String, "test.xlsx");
+        }
+    }
+}

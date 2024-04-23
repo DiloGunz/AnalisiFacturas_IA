@@ -1,0 +1,80 @@
+﻿@using ADIA.Model.DataTransfer.Dtos.InvoiceDtos
+@rendermode InteractiveServer
+
+
+@if(_invoice == null)
+            {
+                <Field>
+                    <FieldLabel>Cargando...</FieldLabel>
+                </Field>
+
+            }
+            else
+            {
+                <Fields>
+                    <Field ColumnSize="ColumnSize.Is4.OnDesktop">
+                        <FieldLabel>Nro. Factura</FieldLabel>
+                        <TextEdit Text="@_invoice.InvoiceNumber" />
+                    </Field>
+                    <Field ColumnSize="ColumnSize.Is4.OnDesktop">
+                        <FieldLabel>Fecha</FieldLabel>
+                        <TextEdit Text="@_invoice.InvoiceDate" />
+                    </Field>
+                    <Field ColumnSize="ColumnSize.Is4.OnDesktop">
+                        <FieldLabel>Total</FieldLabel>
+                        <TextEdit Text="@($"{_invoice.TotalAmmount} {_invoice.Currency}")" />
+                    </Field>
+                </Fields>
+                <Fields>
+                    <Field ColumnSize="ColumnSize.Is6.OnDesktop">
+                        <FieldLabel>Nombre Proveedor</FieldLabel>
+                        <TextEdit Text="@_invoice.SupplierName" />
+                    </Field>
+                    <Field ColumnSize="ColumnSize.Is6.OnDesktop">
+                        <FieldLabel>Direccion Proveedor</FieldLabel>
+                        <TextEdit Text="@_invoice.SupplierAddress" />
+                    </Field>
+                </Fields>
+                <Fields>
+                    <Field ColumnSize="ColumnSize.Is6.OnDesktop">
+                        <FieldLabel>Nombre Cliente</FieldLabel>
+                        <TextEdit Text="@_invoice.CustomerName" />
+                    </Field ColumnSize="ColumnSize.Is4.OnDesktop">
+                    <Field>
+                        <FieldLabel>Direccion Cliente</FieldLabel>
+                        <TextEdit Text="@_invoice.CustomerAddress" />
+                    </Field>
+                </Fields>
+                
+                
+
+                <Field>
+                    <Table Narrow FixedHeader Striped>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHeaderCell>Descripción</TableHeaderCell>
+                                <TableHeaderCell>Cantidad</TableHeaderCell>
+                                <TableHeaderCell>P. Unit.</TableHeaderCell>
+                                <TableHeaderCell>Sub Total</TableHeaderCell>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            @foreach(var item in _invoice.Items)
+                            {
+                                <TableRow>
+                                    <TableRowHeader>@item.Description</TableRowHeader>
+                                    <TableRowCell>@item.Quantity</TableRowCell>
+                                    <TableRowCell>@item.UnitPrice</TableRowCell>
+                                    <TableRowCell>@item.TotalAmount</TableRowCell>
+                                </TableRow>
+                            }
+                        </TableBody>
+                    </Table>
+                </Field>
+                
+            }
+
+
+@code {
+    [Parameter] public InvoiceDto _invoice { get; set; }
+}

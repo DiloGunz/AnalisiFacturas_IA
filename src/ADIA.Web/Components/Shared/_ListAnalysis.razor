@@ -1,0 +1,53 @@
+﻿@using ADIA.Model.DataTransfer.Dtos.AnalysisDtos
+@using ADIA.Shared.Collection
+@rendermode InteractiveServer
+
+<Table>
+    <TableHeader>
+        <TableRow>
+            <TableHeaderCell>Nombre Archivo</TableHeaderCell>
+            <TableHeaderCell>Tipo</TableHeaderCell>
+            <TableHeaderCell>Fecha Análisis</TableHeaderCell>
+            <TableHeaderCell>Estado</TableHeaderCell>
+            <TableHeaderCell>Tiempo Respuesta</TableHeaderCell>
+            <TableHeaderCell>Tipo Doc Respuesta</TableHeaderCell>
+        </TableRow>
+    </TableHeader>
+    <TableBody>
+        @if (_pagedList.HasItems)
+        {
+            @foreach (var item in _pagedList.Items)
+            {
+                <TableRow @key="@item">
+                    <TableRowHeader>@($"{item.FileName}{item.FileExtension}")</TableRowHeader>
+                    <TableRowCell>@item.FileType</TableRowCell>
+                    <TableRowCell>@item.AnalysisDate</TableRowCell>
+                    @if (item.AnalysisResponseListDto != null)
+                    {
+                        <TableRowCell>@(item.AnalysisResponseListDto!.IsSuccess ? "Correcto" : "Incorrecto")</TableRowCell>
+                        <TableRowCell>@item.AnalysisResponseListDto!.ResponseTime</TableRowCell>
+                        <TableRowCell>@item.AnalysisResponseListDto!.DocumentType</TableRowCell>
+                    }
+                    else
+                    {
+                        <TableRowCell>No Completado</TableRowCell>
+                        <TableRowCell>-</TableRowCell>
+                        <TableRowCell>-</TableRowCell>
+                    }
+
+                </TableRow>
+            }
+        }
+        else
+        {
+            <h3>No hay resultados disponibles</h3>
+        }
+    </TableBody>
+</Table>
+
+<_Pagination CurrentPage="_pagedList.Page" TotalPages="_pagedList.Pages" Radio="3" SelectedPageEvent="@SelectedPageEvent" />
+
+@code {
+    [Parameter] public DataCollection<AnalysisListDto> _pagedList { get; set; }
+    [Parameter] public EventCallback<int> SelectedPageEvent { get; set; }
+}

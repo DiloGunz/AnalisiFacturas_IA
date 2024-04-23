@@ -1,0 +1,28 @@
+﻿@using ADIA.Model.DataTransfer.Dtos.GeneralTextDtos
+
+@if (_textoInfo == null)
+{
+    <Field>
+        <FieldLabel>Cargando...</FieldLabel>
+    </Field>
+}
+else
+{
+    <Field>
+        <FieldLabel>Descripción</FieldLabel>
+        <TextEdit Text="@_textoInfo.Description" />
+    </Field>
+    <Field>
+        <FieldLabel>Resumen</FieldLabel>
+        <TextEdit Text="@_textoInfo.Summary" />
+    </Field>
+    <Field>
+        <FieldLabel>Sentimiento</FieldLabel>
+        <TextEdit Text="@_textoInfo.Sentiment" />
+    </Field>
+}
+
+@code {
+    [Parameter]
+    public GeneralTextDto _textoInfo { get; set; }
+}

@@ -1,0 +1,203 @@
+﻿@page "/"
+@using ADIA.Model.DataTransfer.Commands.AnalysisCommands
+@using ADIA.Model.DataTransfer.Commands
+@using ADIA.Model.DataTransfer.Dtos.AnalysisResponseDtos
+@using ADIA.Model.DataTransfer.Dtos.GeneralTextDtos
+@using ADIA.Model.DataTransfer.IaResponses
+@using ADIA.Shared.Enums
+@using ADIA.Shared.Response
+@using ADIA.Web.Utils;
+@using ADIA.Model.DataTransfer.Dtos.InvoiceDtos;
+@using MediatR
+@inject MediatR.IMediator _privateMediator;
+
+@rendermode InteractiveServer
+
+<PageTitle>Home</PageTitle>
+
+<Jumbotron Background="Background.Light" Margin="Margin.Is4.FromBottom">
+    <JumbotronTitle Size="JumbotronTitleSize.Is4">Analizar Archivos</JumbotronTitle>
+    <JumbotronSubtitle>
+        Seleccionar un un archivo (PDF, JPG, PNG) y el sistema determinará si es FACTURA O TEXTO
+    </JumbotronSubtitle>
+    <Divider></Divider>
+    <Paragraph>
+        <Field>
+            <FileEdit @ref="_fileUploader" Placeholder="Archivos permitidos: *.pdf, *.jpg, *.png" Filter=".pdf, .jpg, .png" Changed="OnChanged"></FileEdit>
+        </Field>
+        <Button @ref="_btnAnalice" Color="Color.Info" Clicked="AnalizeAsync" Block Disabled="@_btnAnaliceDisabled">Analizar</Button>
+        @if (_progresoVisible)
+        {
+            <Field>
+                <Progress Indeterminate />
+            </Field>
+        }
+    </Paragraph>
+</Jumbotron>
+
+<Toaster>
+    <Toast @bind-Visible="@_toastVisible">
+        <ToastHeader>
+            <Strong Margin="Margin.IsAuto.FromEnd">Error</Strong>
+            <Small></Small>
+            <CloseButton />
+        </ToastHeader>
+        <ToastBody>
+            @_mensageRespuesta
+        </ToastBody>
+    </Toast>
+</Toaster>
+
+<Modal @ref="modalFactura">
+    <ModalContent Centered Size="ModalSize.ExtraLarge">
+        <ModalHeader>
+            <ModalTitle>Factura</ModalTitle>
+            <CloseButton />
+        </ModalHeader>
+        <ModalBody>
+            <_FacturaInfo _invoice="@_factura"/>
+        </ModalBody>
+        <ModalFooter>
+            <Button Color="Color.Secondary" Clicked="@HideModalFactura">Cerrar</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
+<Modal @ref="modalTexto">
+    <ModalContent Centered Size="ModalSize.ExtraLarge">
+        <ModalHeader>
+            <ModalTitle>Texto</ModalTitle>
+            <CloseButton />
+        </ModalHeader>
+        <ModalBody>
+            <_TextoInfo _textoInfo="@_textoInfo"/>
+        </ModalBody>
+        <ModalFooter>
+            <Button Color="Color.Secondary" Clicked="@HideModalTexto">Cerrar</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
+@code {
+    public Button _btnAnalice;
+    public bool _btnAnaliceDisabled = true;
+
+    public FileEdit _fileUploader;
+
+    private InvoiceDto _factura;
+    private GeneralTextDto _textoInfo;
+    //private UndefinedDto _noClasificado;
+
+    public bool _progresoVisible = false;
+
+    private bool _toastVisible = false;
+
+    private string _mensageRespuesta = "";
+
+
+    public IMediator _mediator { get; set; }
+
+    protected override void OnInitialized()
+    {
+        _mediator = _privateMediator;
+        base.OnInitialized();
+    }
+
+    public Task OnChanged(FileChangedEventArgs e)
+    {
+        var selectedFile = e.Files;
+        if (selectedFile != null && selectedFile.Any())
+        {
+            _btnAnaliceDisabled = false;
+        }
+        else
+        {
+            _btnAnaliceDisabled = true;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public async Task AnalizeAsync()
+    {
+        _progresoVisible = true;
+        if (_fileUploader.Files.Any())
+        {
+            var file = _fileUploader.Files.First();
+
+            await AnalyzeFileAsync(file);
+        }
+        _progresoVisible = false;
+    }
+
+    public async Task AnalyzeFileAsync(IFileEntry file)
+    {
+        byte[] imagenArray = await file.ConvertirByteArrayAsync();
+
+        if (imagenArray != null)
+        {
+            var command = new CreateAnalysisCommand()
+            {
+                File = imagenArray,
+                FileExtension = Path.GetExtension(file.Name),
+                FileName = Path.GetFileNameWithoutExtension(file.Name)
+            };
+
+            var response = await _mediator.Send(command);
+
+            if (response.IsSuccess)
+            {
+                await ValidarArchivoAsync(response.Result);
+            }
+            else
+            {
+                _mensageRespuesta = response.Message;
+                _toastVisible = true;
+            }
+        }
+    }
+
+
+    public async Task ValidarArchivoAsync(AnalysisResponseDto response)
+    {
+        switch (response.DocumentType)
+        {
+            case EntityEnums.DocumentType.Invoice:
+                _factura = response.Invoice;
+                await modalFactura.Show();
+                break;
+            case EntityEnums.DocumentType.GeneralText:
+                _textoInfo = response.GeneralText;
+                await modalTexto.Show();
+                break;
+            case EntityEnums.DocumentType.Undefined:
+                break;
+            default:
+                break;
+        }
+    }
+
+    public Modal modalFactura;
+
+    private Task ShowModalFactura()
+    {
+        return modalFactura.Show();
+    }
+
+    private Task HideModalFactura()
+    {
+        return modalFactura.Hide();
+    }
+
+    public Modal modalTexto;
+
+    private Task ShowModalTexto()
+    {
+        return modalTexto.Show();
+    }
+
+    private Task HideModalTexto()
+    {
+        return modalTexto.Hide();
+    }
+}

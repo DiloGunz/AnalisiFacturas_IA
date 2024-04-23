@@ -1,0 +1,88 @@
+﻿﻿<nav aria-label="Page navigation example">
+    <ul class="pagination justify-content-center">
+        @foreach (var _page in _pages)
+        {
+            <li @onclick="@(() => FunctionSelectedPage(_page))"
+                style="cursor: pointer;"
+                class="page-item @(_page.Enabled ? null : "disabled") @(_page.Active ? "active" : null)">
+                <span class="page-link" href="#">@_page.Text</span>
+            </li>
+        }
+    </ul>
+</nav>
+
+@code {
+    [Parameter] public int CurrentPage { get; set; } = 1;
+    [Parameter] public int TotalPages { get; set; }
+    [Parameter] public int Radio { get; set; } = 3;
+    [Parameter] public EventCallback<int> SelectedPageEvent { get; set; }
+    List<PageModel> _pages = new List<PageModel>();
+
+    protected override void OnParametersSet()
+    {
+        LoadPages();
+    }
+
+    private async Task FunctionSelectedPage(PageModel page)
+    {
+        if (page.Page == CurrentPage)
+        {
+            return;
+        }
+
+        if (!page.Enabled)
+        {
+            return;
+        }
+
+        CurrentPage = page.Page;
+
+        LoadPages();
+
+        await SelectedPageEvent.InvokeAsync(page.Page);
+    }
+
+    private void LoadPages()
+    {
+        _pages = new List<PageModel>();
+        var previusPagedEnabled = CurrentPage != 1;
+        var previousPaged = (CurrentPage == 1) ? 1 : CurrentPage - 1;
+        _pages.Add(new PageModel(previousPaged, previusPagedEnabled, "Anterior"));
+
+        for (int i = 1; i <= TotalPages; i++)
+        {
+            if (i >= CurrentPage - Radio && i <= CurrentPage + Radio)
+            {
+                _pages.Add(new PageModel(i) { Active = CurrentPage == i });
+            }
+        }
+
+        var nextPagedEnabled = CurrentPage != TotalPages;
+        var nextPaged = (CurrentPage == TotalPages) ? TotalPages : CurrentPage + 1;
+        _pages.Add(new PageModel(nextPaged, nextPagedEnabled, "Siguiente"));
+    }
+
+    class PageModel
+    {
+
+        public PageModel(int page)
+            : this(page, true)
+        { }
+
+        public PageModel(int page, bool enabled)
+            : this(page, enabled, page.ToString())
+        { }
+
+        public PageModel(int page, bool enabled, string text)
+        {
+            Page = page;
+            Enabled = enabled;
+            Text = text;
+        }
+
+        public string Text { get; set; }
+        public int Page { get; set; }
+        public bool Enabled { get; set; } = true;
+        public bool Active { get; set; } = false;
+    }
+}
