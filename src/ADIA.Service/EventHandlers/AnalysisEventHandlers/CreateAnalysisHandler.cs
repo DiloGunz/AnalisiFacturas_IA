@@ -4,7 +4,6 @@ using ADIA.Model.DataTransfer.IaResponses;
 using ADIA.Model.Domain.Entities;
 using ADIA.Service.AnalysisStrategies.Interfaces;
 using ADIA.Service.Validations.Extensions.Extensions;
-using ADIA.Shared.Enums;
 using ADIA.Shared.Extensions;
 using ADIA.Shared.Response;
 using ADIA.Uow.Interfaces;
@@ -42,144 +41,75 @@ public class CreateAnalysisHandler : IRequestHandler<CreateAnalysisCommand, AppR
         var response = AppResponse<AnalysisResponseDto>.CreateDefault();
         try
         {
-            var validator = await _validator.ValidateAsync(request, cancellationToken);
-
-            if (!validator.IsValid) return response.Validation(validator.GetMessageErrors());
-
+            ValidateRequest(request, cancellationToken, response);
             var analysis = await CreateEntityAsync(request);
-
-            var strategy = _analysisStrategyResolver.Resolve(analysis.FileType);
-            var analysisResult = await strategy.AnalyzeAsync(request);
-
-            var analysisResponse = await CreateAnalysisResponseAsync(analysis.Id, analysisResult);
-
-            if (!analysisResponse.IsSuccess)
-            {
-                return response.Failure(analysisResponse.Message);
-            }
-            return response.Success(_mapper.Map<AnalysisResponseDto>(analysisResponse));
+            var analysisResult = await AnalyzeDocument(analysis, request);
+            return await ProcessAnalysisResponse(analysisResult, analysis.Id);
         }
-
         catch (Exception ex)
         {
-            response.Failure(ex.Message);
-            _logger.LogError(ex, ex.Message);
+            _logger.LogError(ex, "Error processing analysis command.");
+            return response.Failure(ex.Message);
         }
-        return response;
     }
 
+    private async void ValidateRequest(CreateAnalysisCommand request, CancellationToken cancellationToken, AppResponse<AnalysisResponseDto> response)
+    {
+        var validationResult = await _validator.ValidateAsync(request, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            throw new ValidationException(validationResult.GetMessageErrors().FirstOrDefault());
+        }
+    }
 
     private async Task<Analysis> CreateEntityAsync(CreateAnalysisCommand request)
     {
-        var fileBase64 = Convert.ToBase64String(request.File);
-
-        if (string.IsNullOrWhiteSpace(fileBase64))
-        {
-            throw new Exception("El archivo no se pudo convertir a BASE64");
-        }
-
         var entity = new Analysis()
         {
             AnalysisDate = DateTime.Now,
-            FileBase64 = fileBase64.Trim(),
-            FileExtension = request.FileExtension.ToUpperTrim(),
-            FileName = request.FileName.ToUpperTrim(),
+            FileBase64 = ConvertToBase64(request.File),
+            FileExtension = request.FileExtension.ToUpper().Trim(),
+            FileName = request.FileName.ToUpper().Trim(),
             FileType = request.FileExtension.GetFileType(),
         };
-
         await _uow.Repository.Analysis.AddAsync(entity);
-
         await _uow.SaveChangesAsync();
-
         return entity;
     }
 
-    private async Task<AnalysisResponse> CreateAnalysisResponseAsync(long idAnalysis, AnalysisIAResultDto request)
+    private string ConvertToBase64(byte[] file)
     {
-        var entity = new AnalysisResponse()
+        var fileBase64 = Convert.ToBase64String(file);
+        if (string.IsNullOrWhiteSpace(fileBase64))
         {
-            IdAnalysis = idAnalysis,
-            IsSuccess = request.Success,
-            DocumentType = request.DocumentType,
-            Ia = EntityEnums.Ia.OpenIa,
-            StartAnalysis = request.Start,
-            EndAnalysis = request.End,
-            ResponseTime = (decimal)(request.End - request.Start).TotalMilliseconds,
-            Message = request.Message.ToUpperTrim(),
-        };
-
-        await _uow.Repository.AnalysisResponses.AddAsync(entity);
-
-        if (request.DocumentType == EntityEnums.DocumentType.Invoice)
-        {
-            entity.Invoice = GetInvoice(request.Data);
+            throw new Exception("El archivo no se pudo convertir a BASE64.");
         }
-        else if (request.DocumentType == EntityEnums.DocumentType.GeneralText)
-        {
-            entity.GeneralText = GetGeneralText(request.Data);
-        }
-        else if (request.DocumentType == EntityEnums.DocumentType.Undefined)
-        {
-            entity.IsSuccess = false;
-        }
+        return fileBase64.Trim();
+    }
 
+    private async Task<AnalysisResponse> AnalyzeDocument(Analysis analysis, CreateAnalysisCommand request)
+    {
+        var strategy = _analysisStrategyResolver.Resolve(analysis.FileType);
+        var analysisResult = await strategy.AnalyzeAsync(request);
+        return await CreateAnalysisResponseAsync(analysis.Id, analysisResult);
+    }
+
+    private Task<AppResponse<AnalysisResponseDto>> ProcessAnalysisResponse(AnalysisResponse analysisResponse, long analysisId)
+    {
+        if (!analysisResponse.IsSuccess)
+        {
+            throw new InvalidOperationException("Analysis response indicates failure: " + analysisResponse.Message);
+        }
+        var analysisResponseDto = _mapper.Map<AnalysisResponseDto>(analysisResponse);
+        return Task.FromResult(new AppResponse<AnalysisResponseDto>().Success(analysisResponseDto));
+    }
+
+    private async Task<AnalysisResponse> CreateAnalysisResponseAsync(long analysisId, AnalysisIAResultDto resultDto)
+    {
+        var analysisResponse = _mapper.Map<AnalysisResponse>(resultDto);
+        analysisResponse.IdAnalysis = analysisId;
+        await _uow.Repository.AnalysisResponses.AddAsync(analysisResponse);
         await _uow.SaveChangesAsync();
-
-        return entity;
-    }
-
-    private Invoice GetInvoice(object request)
-    {
-        var invoiceDto = request as InvoiceIADto;
-
-        if (invoiceDto is null)
-        {
-            throw new Exception("Error al crear la facatura en BD.");
-        }
-
-        var invoice = new Invoice()
-        {
-            Currency = invoiceDto.Currency.ToUpperTrim(),
-            CustomerAddress = invoiceDto.CustomerAddress.ToUpperTrim(),
-            CustomerName = invoiceDto.CustomerName.ToUpperTrim(),
-            InvoiceDate = invoiceDto.InvoiceDateTime.ToUpperTrim(),
-            InvoiceNumber = invoiceDto.InvoiceNumber.ToUpperTrim(),
-            SupplierAddress = invoiceDto.SupplierAddress.ToUpperTrim(),
-            SupplierName = invoiceDto.SupplierName.ToUpperTrim(),
-            TotalAmmount = invoiceDto.TotalAmmount,
-            Items = new List<ItemInvoice>()
-        };
-
-        foreach (var item in invoiceDto.Items)
-        {
-            var itemInvoice = new ItemInvoice()
-            {
-                Description = item.Description.ToUpperTrim(),
-                Quantity = item.Quantity,
-                TotalAmount = item.TotalAmount,
-                UnitPrice = item.UnitPrice,
-            };
-
-            invoice.Items.Add(itemInvoice);
-        }
-
-        return invoice;
-    }
-
-    private GeneralText GetGeneralText(object request)
-    {
-        var generalTextDto = request as GeneralTextIADto;
-
-        if (generalTextDto == null)
-        {
-            throw new Exception("Error al crear el texto general en BD.");
-        }
-
-        return new GeneralText()
-        {
-            Description = generalTextDto.Description.ToUpperTrim(),
-            Sentiment = generalTextDto.Sentiment.ToUpperTrim(),
-            Summary = generalTextDto.Summary.ToUpperTrim(),
-        };
+        return analysisResponse;
     }
 }
