@@ -1,6 +1,7 @@
 ﻿using ADIA.OpenAi.Proxy.Config.Models;
 using ADIA.OpenAi.Proxy.Models;
 using ADIA.OpenAi.Proxy.Services;
+using ADIA.Tests.Adapters;
 using Microsoft.Extensions.Logging;
 using Moq;
 using OpenAI_API;
@@ -39,22 +40,10 @@ public class AnalysisTextOpenAITests
     public async Task ProcessAsync_ThrowsArgumentException_WhenPromptUserIsEmpty()
     {
         var request = new AnalysisOpenIARequest { PromptUser = "" };
-        await Assert.ThrowsAsync<ArgumentException>(() => _service.ProcessAsync(request));
+        var reponse = await _service.ProcessAsync(request);
+        Assert.False(reponse.Success);
     }
 
-    //[Fact]
-    //public async Task ProcessAsync_CompletesSuccessfully_WhenRequestIsValid()
-    //{
-    //    var request = new AnalysisOpenIARequest { PromptUser = "Hello, world!" };
-    //    var chatResult = new ChatResult { Choices = new[] { new ChatMessage { TextContent = "Response" } } };
-    //    _mockApi.Setup(api => api.Chat.CreateChatCompletionAsync(It.IsAny<ChatRequest>()))
-    //            .ReturnsAsync(chatResult);
-
-    //    var response = await _service.ProcessAsync(request);
-
-    //    Assert.True(response.Success);
-    //    Assert.Equal("Response", response.Result);
-    //}
 
     [Fact]
     public async Task ProcessAsync_CatchesExceptions_AndLogsError()
@@ -67,31 +56,6 @@ public class AnalysisTextOpenAITests
         Assert.False(response.Success);
         _mockLogger.Verify(logger => logger.LogError(It.IsAny<Exception>(), It.IsAny<string>()), Times.Once);
     }
-
-    //[Fact]
-    //public async Task ProcessAsync_ValidatesResponseSuccessfully()
-    //{
-    //    var request = new AnalysisOpenIARequest { PromptUser = "Hello, world!" };
-    //    var chatResult = new ChatResult { Choices = new[] { new ChatMessage { TextContent = "Response" } } };
-    //    _mockApi.Setup(api => api.Chat.CreateChatCompletionAsync(It.IsAny<ChatRequest>()))
-    //            .ReturnsAsync(chatResult);
-
-    //    var response = await _service.ProcessAsync(request);
-
-    //    Assert.True(response.Success);
-    //    Assert.NotEmpty(response.Result);
-    //}
-
-    //[Fact]
-    //public async Task ProcessAsync_Fails_WhenApiResponseIsEmpty()
-    //{
-    //    var request = new AnalysisOpenIARequest { PromptUser = "Hello, world!" };
-    //    var chatResult = new ChatResult { Choices = new[] { new ChatMessage { TextContent = "" } } };
-    //    _mockApi.Setup(api => api.Chat.CreateChatCompletionAsync(It.IsAny<ChatRequest>()))
-    //            .ReturnsAsync(chatResult);
-
-    //    await Assert.ThrowsAsync<InvalidOperationException>(() => _service.ProcessAsync(request));
-    //}
 
     [Fact]
     public async Task ProcessAsync_HandlesGeneralException_AndReturnsCustomMessage()
@@ -106,16 +70,5 @@ public class AnalysisTextOpenAITests
         Assert.Contains("Test exception", result.Result);
     }
 
-    //[Fact]
-    //public async Task ProcessAsync_RecordsStartAndEndTime()
-    //{
-    //    var request = new AnalysisOpenIARequest { PromptUser = "Hello, world!" };
-    //    var chatResult = new ChatResult { Choices = new[] { new ChatMessage { TextContent = "Response" } } };
-    //    _mockApi.Setup(api => api.Chat.CreateChatCompletionAsync(It.IsAny<ChatRequest>()))
-    //            .ReturnsAsync(chatResult);
-
-    //    var response = await _service.ProcessAsync(request);
-
-    //    Assert.True(response.End >= response.Start);
-    //}
+ 
 }

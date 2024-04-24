@@ -10,8 +10,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Blazorise.Tests.bUnit" Version="1.5.2" />
-    <PackageReference Include="bunit" Version="1.28.9" />
     <PackageReference Include="coverlet.collector" Version="6.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="Moq" Version="4.20.70" />
@@ -21,7 +19,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ADIA.Service\ADIA.Service.csproj" />
-    <ProjectReference Include="..\ADIA.Web\ADIA.Web.csproj" />
   </ItemGroup>
 
   <ItemGroup>

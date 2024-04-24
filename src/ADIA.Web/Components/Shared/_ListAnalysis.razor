@@ -1,5 +1,11 @@
 ﻿@using ADIA.Model.DataTransfer.Dtos.AnalysisDtos
+@using ADIA.Model.DataTransfer.Dtos.GeneralTextDtos
+@using ADIA.Model.DataTransfer.Dtos.InvoiceDtos
+@using ADIA.Model.DataTransfer.Queries
 @using ADIA.Shared.Collection
+@using ADIA.Shared.Enums
+@using ADIA.Shared.Extensions
+@inject MediatR.IMediator _mediator
 @rendermode InteractiveServer
 
 <Table>
@@ -11,6 +17,7 @@
             <TableHeaderCell>Estado</TableHeaderCell>
             <TableHeaderCell>Tiempo Respuesta</TableHeaderCell>
             <TableHeaderCell>Tipo Doc Respuesta</TableHeaderCell>
+            <TableHeaderCell>Opciones</TableHeaderCell>
         </TableRow>
     </TableHeader>
     <TableBody>
@@ -26,13 +33,15 @@
                     {
                         <TableRowCell>@(item.AnalysisResponseListDto!.IsSuccess ? "Correcto" : "Incorrecto")</TableRowCell>
                         <TableRowCell>@item.AnalysisResponseListDto!.ResponseTime</TableRowCell>
-                        <TableRowCell>@item.AnalysisResponseListDto!.DocumentType</TableRowCell>
+                        <TableRowCell>@item.AnalysisResponseListDto!.DocumentType.GetDescription()</TableRowCell>
+                        <TableRowCell><Button Color="Color.Light" Size="Size.Small" Clicked="(()=>ViewAnalysisAsync(item.AnalysisResponseListDto.Id, item.AnalysisResponseListDto.DocumentType))">Ver</Button></TableRowCell>
                     }
                     else
                     {
                         <TableRowCell>No Completado</TableRowCell>
                         <TableRowCell>-</TableRowCell>
                         <TableRowCell>-</TableRowCell>
+                        <TableRowCell><Button Color="Color.Light" Size="Size.Small" Disabled>Ver</Button></TableRowCell>
                     }
 
                 </TableRow>
@@ -47,7 +56,89 @@
 
 <_Pagination CurrentPage="_pagedList.Page" TotalPages="_pagedList.Pages" Radio="3" SelectedPageEvent="@SelectedPageEvent" />
 
+<Modal @ref="modalInvoice">
+    <ModalContent Centered Size="ModalSize.ExtraLarge">
+        <ModalHeader>
+            <ModalTitle>Factura</ModalTitle>
+            <CloseButton />
+        </ModalHeader>
+        <ModalBody>
+            <_FacturaInfo _invoice="@_invoice" />
+        </ModalBody>
+        <ModalFooter>
+            <Button Color="Color.Secondary" Clicked="@HideModalInvoice">Cerrar</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
+<Modal @ref="modalGeneralText">
+    <ModalContent Centered Size="ModalSize.ExtraLarge">
+        <ModalHeader>
+            <ModalTitle>Texto</ModalTitle>
+            <CloseButton />
+        </ModalHeader>
+        <ModalBody>
+            <_TextoInfo _textoInfo="@_generalText" />
+        </ModalBody>
+        <ModalFooter>
+            <Button Color="Color.Secondary" Clicked="@HideModalGeneraltext">Cerrar</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
 @code {
     [Parameter] public DataCollection<AnalysisListDto> _pagedList { get; set; }
     [Parameter] public EventCallback<int> SelectedPageEvent { get; set; }
+
+    private InvoiceDto _invoice;
+    private GeneralTextDto _generalText;
+
+    public async Task ViewAnalysisAsync(long id, EntityEnums.DocumentType documentType)
+    {
+        var query = new GetAnalysisResponseByIdQuery(id);
+        var response = await _mediator.Send(query);
+        if (response != null)
+        {
+            switch (documentType)
+            {
+                case EntityEnums.DocumentType.Invoice:
+                    _invoice = response.Invoice;
+                    await modalInvoice.Show();
+                    break;
+                case EntityEnums.DocumentType.GeneralText:
+                    _generalText = response.GeneralText;
+                    await modalGeneralText.Show();
+                    break;
+                case EntityEnums.DocumentType.Undefined:
+                    break;
+                default:
+                    break;
+            }
+
+        }
+    }
+
+    public Modal modalInvoice;
+
+    private Task ShowModalInvoice()
+    {
+        return modalInvoice.Show();
+    }
+
+    private Task HideModalInvoice()
+    {
+        return modalInvoice.Hide();
+    }
+
+    public Modal modalGeneralText;
+
+    private Task ShowGeneralText()
+    {
+        return modalGeneralText.Show();
+    }
+
+    private Task HideModalGeneraltext()
+    {
+        return modalGeneralText.Hide();
+    }
 }

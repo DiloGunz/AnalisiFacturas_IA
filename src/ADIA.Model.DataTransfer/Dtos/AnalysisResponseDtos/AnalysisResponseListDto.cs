@@ -4,6 +4,7 @@ namespace ADIA.Model.DataTransfer.Dtos.AnalysisResponseDtos;
 
 public record AnalysisResponseListDto
 {
+    public long Id { get; set; }
     public DateTime StartAnalysis { get; set; }
     public DateTime EndAnalysis { get; set; }
     public bool IsSuccess { get; set; }
