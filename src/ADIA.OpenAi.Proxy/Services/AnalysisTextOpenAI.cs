@@ -25,17 +25,18 @@ public class AnalysisTextOpenAI : IAnalysisTextOpenAI
     public async Task<AnalysisOpenIAResponse> ProcessAsync(AnalysisOpenIARequest request)
     {
         var analysisResponse = new AnalysisOpenIAResponse() { Start = DateTime.Now };
+
         try
         {
             ValidateRequest(request);
-            var api = new OpenAIAPI(_openIaConfig.ApiKey);
-            var result = await CreateChatCompletionAsync(api, request);
-            ProcessResult(result, analysisResponse);
+            var result = await GetChatResultAsync(request);
+            PopulateAnalysisResponse(result, analysisResponse);
         }
         catch (Exception ex)
         {
             HandleException(ex, analysisResponse);
         }
+
         analysisResponse.End = DateTime.Now;
         return analysisResponse;
     }
@@ -46,9 +47,15 @@ public class AnalysisTextOpenAI : IAnalysisTextOpenAI
             throw new ArgumentException("Se ingresó un texto vacío");
     }
 
+    private async Task<ChatResult> GetChatResultAsync(AnalysisOpenIARequest request)
+    {
+        var api = new OpenAIAPI(_openIaConfig.ApiKey);
+        return await CreateChatCompletionAsync(api, request);
+    }
+
     private async Task<ChatResult> CreateChatCompletionAsync(OpenAIAPI api, AnalysisOpenIARequest request)
     {
-        return await api.Chat.CreateChatCompletionAsync(new ChatRequest()
+        return await api.Chat.CreateChatCompletionAsync(new ChatRequest
         {
             Model = Model.ChatGPTTurbo,
             Temperature = 0.1,
@@ -60,11 +67,12 @@ public class AnalysisTextOpenAI : IAnalysisTextOpenAI
         });
     }
 
-    private void ProcessResult(ChatResult result, AnalysisOpenIAResponse response)
+    private void PopulateAnalysisResponse(ChatResult result, AnalysisOpenIAResponse response)
     {
         var openIaResponse = result.Choices[0].Message;
         if (openIaResponse == null || string.IsNullOrWhiteSpace(openIaResponse.TextContent))
             throw new InvalidOperationException("La respuesta de OPENIA fue nula o vacía");
+
         ValidateOpenIaResponse.Process(openIaResponse.TextContent);
         response.Success = true;
         response.Result = openIaResponse.TextContent;
