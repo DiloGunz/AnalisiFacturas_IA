@@ -3,6 +3,7 @@ using ADIA.AzureIa.Proxy.Services;
 using ADIA.Model.DataTransfer.Commands.AnalysisCommands;
 using ADIA.Model.DataTransfer.IaResponses;
 using ADIA.OpenAi.Proxy.Models;
+using ADIA.OpenAi.Proxy.Responses;
 using ADIA.OpenAi.Proxy.Services;
 using ADIA.Service.AnalysisStrategies.Interfaces;
 using ADIA.Service.IaServices.Promts;
@@ -25,59 +26,79 @@ public class PdfAnalysisStrategy : IAnalysisStrategy
 
     public async Task<AnalysisIAResultDto> AnalyzeAsync(CreateAnalysisCommand command)
     {
-        var azureIARequest = new AnalysisAzureIARequest()
+        var azureResult = await AnalyzePdfWithAzureAI(command);
+        if (!azureResult.Success)
         {
-            File = command.File
-        };
-
-        var resultAzureIa = await _analysisPdfAzureAIService.ProcessPdfAsync(azureIARequest);
-
-        if (!resultAzureIa.Success)
-        {
-            return new AnalysisIAResultDto()
-            {
-                Success = false,
-                DocumentType = EntityEnums.DocumentType.Undefined,
-                Start = resultAzureIa.Start,
-                End = resultAzureIa.End,
-                Message = resultAzureIa.Result
-            };
+            return CreateFailureResult(azureResult);
         }
 
-        var openIARequest = new AnalysisOpenIARequest()
+        var openIAResult = await AnalyzeTextWithOpenAI(azureResult.Result);
+        if (!openIAResult.Success)
+        {
+            return CreateFailureResult(openIAResult);
+        }
+
+        return DeserializeAndPrepareResult(openIAResult);
+    }
+
+    private async Task<AnalysisAzureIAResponse> AnalyzePdfWithAzureAI(CreateAnalysisCommand command)
+    {
+        var azureIARequest = new AnalysisAzureIARequest { File = command.File };
+        return await _analysisPdfAzureAIService.ProcessPdfAsync(azureIARequest);
+    }
+
+    private async Task<AnalysisOpenIAResponse> AnalyzeTextWithOpenAI(string extractedText)
+    {
+        var openIARequest = new AnalysisOpenIARequest
         {
             PromptSystem = PromtsIA.PromtSystem,
-            PromptUser = string.Join("\n", PromtsIA.PromptPdf, resultAzureIa.Result)
+            PromptUser = string.Join("\n", PromtsIA.PromptPdf, extractedText)
         };
+        return await _analysisTextOpenAI.ProcessAsync(openIARequest);
+    }
 
-        var resultOpenIA = await _analysisTextOpenAI.ProcessAsync(openIARequest);
-
-        if (!resultOpenIA.Success)
+    private AnalysisIAResultDto CreateFailureResult(AnalysisOpenIAResponse response)
+    {
+        return new AnalysisIAResultDto
         {
-            return new AnalysisIAResultDto()
-            {
-                Success = false,
-                DocumentType = EntityEnums.DocumentType.Undefined,
-                Start = resultOpenIA.Start,
-                End = resultOpenIA.End,
-                Message = resultOpenIA.Result
-            };
-        }
+            Success = false,
+            DocumentType = EntityEnums.DocumentType.Undefined,
+            Start = response.Start,
+            End = response.End,
+            Message = response.Result
+        };
+    }
 
-        var result = JsonSerializer.Deserialize<AnalysisIAResultDto>(resultOpenIA.Result, new JsonSerializerOptions()
+    private AnalysisIAResultDto CreateFailureResult(AnalysisAzureIAResponse response)
+    {
+        return new AnalysisIAResultDto
         {
-            PropertyNameCaseInsensitive = true,
-        });
+            Success = false,
+            DocumentType = EntityEnums.DocumentType.Undefined,
+            Start = response.Start,
+            End = response.End,
+            Message = response.Result
+        };
+    }
 
+    private AnalysisIAResultDto DeserializeAndPrepareResult(AnalysisOpenIAResponse response)
+    {
+        var result = JsonSerializer.Deserialize<AnalysisIAResultDto>(response.Result, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         if (result == null)
         {
             throw new Exception("Error al leer los datos devueltos por IA");
         }
 
         result.Success = true;
-        result.Start = resultOpenIA.Start;
-        result.End = resultOpenIA.End;
+        result.Start = response.Start;
+        result.End = response.End;
+        MapDataToDto(result);
 
+        return result;
+    }
+
+    private void MapDataToDto(AnalysisIAResultDto result)
+    {
         switch (result.DocumentType)
         {
             case EntityEnums.DocumentType.Undefined:
@@ -92,7 +113,5 @@ public class PdfAnalysisStrategy : IAnalysisStrategy
             default:
                 throw new Exception("Error en el tipo de archivo en la respuesta devuelta por IA.");
         }
-
-        return result;
     }
 }
