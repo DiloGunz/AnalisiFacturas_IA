@@ -1,13 +1,20 @@
 ﻿using ADIA.Model.DataTransfer.Dtos.AnalysisDtos;
 using ADIA.Shared.Extensions;
 using ClosedXML.Excel;
-using DocumentFormat.OpenXml.Spreadsheet;
 using System.Data;
 
 namespace ADIA.Web.Utils;
 
+/// <summary>
+/// Proporciona métodos de extensión para exportar datos de análisis a formatos específicos como Excel.
+/// </summary>
 public static class ExportExtensions
 {
+    /// <summary>
+    /// Convierte una lista de DTOs de análisis en un archivo de Excel, creando un documento que resume los resultados de análisis.
+    /// </summary>
+    /// <param name="list">Colección enumerable de DTOs de análisis que se convertirán en Excel.</param>
+    /// <returns>Un MemoryStream que contiene el archivo Excel generado.</returns>
     public static MemoryStream AnalysisToExcel(this IEnumerable<AnalysisListDto> list)
     {
         DataTable dt = new DataTable("Analysis");
@@ -48,21 +55,6 @@ public static class ExportExtensions
         using (var wb = new XLWorkbook())
         {
             var ws = wb.Worksheets.Add(dt, "Hoja1", "Análisis de Documentos");
-
-            //// Agregar título
-            //var titleCell = ws.Cell(1, 1); // La celda A1
-            //titleCell.Value = "Análisis de Documentos";
-            //titleCell.Style.Font.Bold = true;
-            //titleCell.Style.Font.FontSize = 20;
-            //titleCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-
-            //// Combinar celdas para el título
-            //ws.Range(1, 1, 2, dt.Columns.Count).Merge();
-
-            //ws.Row(1).AdjustToContents();
-
-            //// Insertar DataTable en la hoja de Excel
-            //var range = ws.Cell(3, 1).InsertData(dt.AsEnumerable()); // Comienza desde la fila 2
 
             ws.Columns().AdjustToContents();
 
