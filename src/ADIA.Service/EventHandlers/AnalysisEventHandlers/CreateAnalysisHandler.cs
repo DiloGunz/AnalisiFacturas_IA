@@ -4,10 +4,12 @@ using ADIA.Model.DataTransfer.IaResponses;
 using ADIA.Model.Domain.Entities;
 using ADIA.Service.AnalysisStrategies.Interfaces;
 using ADIA.Service.Validations.Extensions.Extensions;
+using ADIA.Shared.Enums;
 using ADIA.Shared.Extensions;
 using ADIA.Shared.Response;
 using ADIA.Uow.Interfaces;
 using AutoMapper;
+using Azure.Core;
 using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.Logging;
@@ -140,14 +142,14 @@ public class CreateAnalysisHandler : IRequestHandler<CreateAnalysisCommand, AppR
     /// <param name="analysisResponse">Resultado del análisis del documento.</param>
     /// <param name="analysisId">Identificador de la entidad de análisis asociada.</param>
     /// <returns>Una respuesta de aplicación encapsulando el DTO de la respuesta de análisis.</returns>
-    private Task<AppResponse<AnalysisResponseDto>> ProcessAnalysisResponse(AnalysisResponse analysisResponse, long analysisId)
+    private async Task<AppResponse<AnalysisResponseDto>> ProcessAnalysisResponse(AnalysisResponse analysisResponse, long analysisId)
     {
         if (!analysisResponse.IsSuccess)
         {
             throw new InvalidOperationException("Analysis response indicates failure: " + analysisResponse.Message);
         }
         var analysisResponseDto = _mapper.Map<AnalysisResponseDto>(analysisResponse);
-        return Task.FromResult(new AppResponse<AnalysisResponseDto>().Success(analysisResponseDto));
+        return new AppResponse<AnalysisResponseDto>().Success(analysisResponseDto);
     }
 
     /// <summary>
@@ -158,7 +160,17 @@ public class CreateAnalysisHandler : IRequestHandler<CreateAnalysisCommand, AppR
     /// <returns>La entidad de respuesta de análisis creada.</returns>
     private async Task<AnalysisResponse> CreateAnalysisResponseAsync(long analysisId, AnalysisIAResultDto resultDto)
     {
-        var analysisResponse = _mapper.Map<AnalysisResponse>(resultDto);
+        var analysisResponse = new AnalysisResponse()
+        {
+            IdAnalysis = analysisId,
+            IsSuccess = resultDto.Success,
+            DocumentType = resultDto.DocumentType,
+            Ia = EntityEnums.Ia.OpenIa,
+            StartAnalysis = resultDto.Start,
+            EndAnalysis = resultDto.End,
+            ResponseTime = (decimal)(resultDto.End - resultDto.Start).TotalMilliseconds,
+            Message = resultDto.Message.ToUpperTrim(),
+        };
         analysisResponse.IdAnalysis = analysisId;
         await _uow.Repository.AnalysisResponses.AddAsync(analysisResponse);
         await _uow.SaveChangesAsync();
