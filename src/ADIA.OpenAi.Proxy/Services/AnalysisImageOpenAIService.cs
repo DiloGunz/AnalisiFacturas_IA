@@ -25,19 +25,26 @@ public class AnalysisImageOpenAIService : IAnalysisImageOpenAIService
     public async Task<AnalysisOpenIAResponse> ProcessAsync(AnalysisOpenIARequest request)
     {
         var analysisResponse = new AnalysisOpenIAResponse() { Start = DateTime.Now };
+
         try
         {
             ValidateRequest(request);
-            var api = new OpenAIAPI(_openIaConfig.ApiKey);
+            var api = GetOpenAIApi();
             var response = await PerformImageAnalysis(api, request);
-            ProcessResponse(response, analysisResponse);
+            PopulateAnalysisResponse(response, analysisResponse);
         }
         catch (Exception ex)
         {
             HandleException(ex, analysisResponse);
         }
+
         analysisResponse.End = DateTime.Now;
         return analysisResponse;
+    }
+
+    private OpenAIAPI GetOpenAIApi()
+    {
+        return new OpenAIAPI(_openIaConfig.ApiKey);
     }
 
     private void ValidateRequest(AnalysisOpenIARequest request)
@@ -58,14 +65,14 @@ public class AnalysisImageOpenAIService : IAnalysisImageOpenAIService
         return response;
     }
 
-    private void ProcessResponse(string response, AnalysisOpenIAResponse analysisResponse)
+    private void PopulateAnalysisResponse(string response, AnalysisOpenIAResponse analysisResponse)
     {
         ValidateOpenIaResponse.Process(response);
         analysisResponse.Success = true;
         analysisResponse.Result = FixResponse.Process(response);
     }
 
-    public void HandleException(Exception ex, AnalysisOpenIAResponse analysisResponse)
+    private void HandleException(Exception ex, AnalysisOpenIAResponse analysisResponse)
     {
         var message = ValidateOpenIaResponse.GetMessageOfBadRequestResponse(ex.Message);
         _logger.LogError(ex, ex.Message);
