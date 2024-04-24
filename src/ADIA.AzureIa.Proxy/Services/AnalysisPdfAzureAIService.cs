@@ -14,6 +14,7 @@ public class AnalysisPdfAzureAIService : IAnalysisPdfAzureAIService
 {
     private readonly AzureIaConfig _azureIaConfig;
     private readonly ILogger<AnalysisPdfAzureAIService> _logger;
+
     public AnalysisPdfAzureAIService(AzureIaConfig azureIaConfig, ILogger<AnalysisPdfAzureAIService> logger)
     {
         _azureIaConfig = azureIaConfig ?? throw new ArgumentNullException(nameof(azureIaConfig));
@@ -25,33 +26,38 @@ public class AnalysisPdfAzureAIService : IAnalysisPdfAzureAIService
         var response = new AnalysisAzureIAResponse { Start = DateTime.Now };
         try
         {
-            var textResults = await AnalyzeTextWithComputerVisionAsync(request.File);
-            if (!textResults.Any())
-            {
-                throw new InvalidOperationException("Azure IA no pudo analizar el archivo PDF.");
-            }
-            response.Success = true;
+            var textResults = await ExtractTextFromPdfAsync(request.File);
+            ValidateResults(textResults);
             response.Result = string.Join("\n", textResults);
+            response.Success = true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing PDF with Azure IA.");
-            response.Success = false;
-            response.Result = ex.Message;
+            HandleException(ex, response);
         }
         response.End = DateTime.Now;
         return response;
     }
 
-    private async Task<List<string>> AnalyzeTextWithComputerVisionAsync(byte[] fileData)
+    private async Task<List<string>> ExtractTextFromPdfAsync(byte[] fileData)
     {
-        var client = new ComputerVisionClient(new ApiKeyServiceClientCredentials(_azureIaConfig.ApiKey))
+        var client = CreateComputerVisionClient();
+        var operationId = await SubmitReadRequestAsync(client, fileData);
+        return await GetTextResultsAsync(client, operationId);
+    }
+
+    private ComputerVisionClient CreateComputerVisionClient()
+    {
+        return new ComputerVisionClient(new ApiKeyServiceClientCredentials(_azureIaConfig.ApiKey))
         {
             Endpoint = _azureIaConfig.EndPoint
         };
+    }
+
+    private async Task<string> SubmitReadRequestAsync(ComputerVisionClient client, byte[] fileData)
+    {
         var textHeaders = await client.ReadInStreamAsync(new MemoryStream(fileData));
-        var operationId = ExtractOperationId(textHeaders.OperationLocation);
-        return await WaitForTextAnalysisResult(client, operationId);
+        return ExtractOperationId(textHeaders.OperationLocation);
     }
 
     private string ExtractOperationId(string operationLocation)
@@ -59,7 +65,7 @@ public class AnalysisPdfAzureAIService : IAnalysisPdfAzureAIService
         return operationLocation.Substring(operationLocation.LastIndexOf('/') + 1);
     }
 
-    private async Task<List<string>> WaitForTextAnalysisResult(ComputerVisionClient client, string operationId)
+    private async Task<List<string>> GetTextResultsAsync(ComputerVisionClient client, string operationId)
     {
         ReadOperationResult results;
         do
@@ -67,6 +73,20 @@ public class AnalysisPdfAzureAIService : IAnalysisPdfAzureAIService
             results = await client.GetReadResultAsync(Guid.Parse(operationId));
         }
         while (results.Status == OperationStatusCodes.Running || results.Status == OperationStatusCodes.NotStarted);
+
         return results.AnalyzeResult.ReadResults.SelectMany(r => r.Lines).Select(l => l.Text).ToList();
+    }
+
+    private void ValidateResults(List<string> results)
+    {
+        if (!results.Any())
+            throw new InvalidOperationException("Azure IA no pudo analizar el archivo PDF.");
+    }
+
+    private void HandleException(Exception ex, AnalysisAzureIAResponse response)
+    {
+        _logger.LogError(ex, "Error processing PDF with Azure IA.");
+        response.Success = false;
+        response.Result = ex.Message;
     }
 }
