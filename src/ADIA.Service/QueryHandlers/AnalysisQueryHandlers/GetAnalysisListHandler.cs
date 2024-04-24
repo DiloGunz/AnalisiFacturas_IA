@@ -1,5 +1,6 @@
 ﻿using ADIA.Model.DataTransfer.Dtos.AnalysisDtos;
 using ADIA.Model.DataTransfer.Queries;
+using ADIA.Model.Domain.Entities;
 using ADIA.Uow.Interfaces;
 using AutoMapper;
 using MediatR;
@@ -21,24 +22,25 @@ public class GetAnalysisListHandler : IRequestHandler<GetAnalysisListQuery, IEnu
         _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
     }
 
-
     public async Task<IEnumerable<AnalysisListDto>> Handle(GetAnalysisListQuery request, CancellationToken cancellationToken)
+    {
+        IEnumerable<Analysis> analysisList = await FetchAnalysisListAsync(request, cancellationToken);
+        return _mapper.Map<IEnumerable<AnalysisListDto>>(analysisList);
+    }
+
+    private async Task<IEnumerable<Analysis>> FetchAnalysisListAsync(GetAnalysisListQuery request, CancellationToken cancellationToken)
     {
         try
         {
-            var query = await _unitOfWork.Repository
-                .Analysis
-                .GetAllAsNoTrackingAsync(
-                    predicate: x => x.AnalysisDate >= request.DtFrom && x.AnalysisDate <= request.DtTo && x.FileName.Contains(request.SearchString),
-                    include: x => x.Include(y => y.AnalysisResponse),
-                    orderBy: x => x.OrderByDescending(y => y.AnalysisDate));
-
-            return _mapper.Map<List<AnalysisListDto>>(query);
+            return await _unitOfWork.Repository.Analysis.GetAllAsNoTrackingAsync(
+                predicate: x => x.AnalysisDate >= request.DtFrom && x.AnalysisDate <= request.DtTo && x.FileName.Contains(request.SearchString),
+                include: x => x.Include(y => y.AnalysisResponse),
+                orderBy: x => x.OrderByDescending(y => y.AnalysisDate));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, ex.Message);
+            _logger.LogError(ex, "Failed to fetch analysis list.");
+            throw; 
         }
-        return new List<AnalysisListDto>();
     }
 }
