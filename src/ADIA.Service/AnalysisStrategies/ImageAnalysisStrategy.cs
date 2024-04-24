@@ -21,29 +21,44 @@ public class ImageAnalysisStrategy : IAnalysisStrategy
 
     public async Task<AnalysisIAResultDto> AnalyzeAsync(CreateAnalysisCommand command)
     {
-        var openIARequest = new AnalysisOpenIARequest()
-        {
-            File = command.File,
-            PromptSystem = PromtsIA.PromtSystem,
-            PromptUser = PromtsIA.PromptImagen
-        };
+        var openIARequest = MapCommandToRequest(command);
         var resultOpenIA = await _analysisImageOpenAIService.ProcessAsync(openIARequest);
 
         if (!resultOpenIA.Success)
         {
-            return new AnalysisIAResultDto()
-            {
-                Success = false,
-                DocumentType = EntityEnums.DocumentType.Undefined,
-                Start = resultOpenIA.Start,
-                End = resultOpenIA.End,
-                Message = resultOpenIA.Result
-            };
+            return CreateFailureResult(resultOpenIA);
         }
 
-        var result = JsonSerializer.Deserialize<AnalysisIAResultDto>(resultOpenIA.Result, new JsonSerializerOptions()
+        return await ParseResult(resultOpenIA);
+    }
+
+    private AnalysisOpenIARequest MapCommandToRequest(CreateAnalysisCommand command)
+    {
+        return new AnalysisOpenIARequest
         {
-            PropertyNameCaseInsensitive = true,
+            File = command.File,
+            PromptSystem = PromtsIA.PromptSystem,  // Fixed a potential typo in property name
+            PromptUser = PromtsIA.PromptImagen
+        };
+    }
+
+    private AnalysisIAResultDto CreateFailureResult(AnalysisOpenIAResponse response)
+    {
+        return new AnalysisIAResultDto
+        {
+            Success = false,
+            DocumentType = EntityEnums.DocumentType.Undefined,
+            Start = response.Start,
+            End = response.End,
+            Message = response.Result
+        };
+    }
+
+    private async Task<AnalysisIAResultDto> ParseResult(AnalysisOpenIAResponse response)
+    {
+        var result = JsonSerializer.Deserialize<AnalysisIAResultDto>(response.Result, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
         });
 
         if (result == null)
@@ -52,24 +67,25 @@ public class ImageAnalysisStrategy : IAnalysisStrategy
         }
 
         result.Success = true;
-        result.Start = resultOpenIA.Start;
-        result.End = resultOpenIA.End;
+        result.Start = response.Start;
+        result.End = response.End;
+        result.Data = MapResultData(result);
 
+        return result;
+    }
+
+    private object MapResultData(AnalysisIAResultDto result)
+    {
         switch (result.DocumentType)
         {
             case EntityEnums.DocumentType.Undefined:
-                result.Data = result.Data.MapTo<UndefinedIADto>();
-                break;
+                return result.Data.MapTo<UndefinedIADto>();
             case EntityEnums.DocumentType.Invoice:
-                result.Data = result.Data.MapTo<InvoiceIADto>();
-                break;
+                return result.Data.MapTo<InvoiceIADto>();
             case EntityEnums.DocumentType.GeneralText:
-                result.Data = result.Data.MapTo<GeneralTextIADto>();
-                break;
+                return result.Data.MapTo<GeneralTextIADto>();
             default:
-                throw new Exception("Error en el tipo de archivo en la respuesta devuelta por IA.");
+                throw new Exception("Tipo de documento no soportado en la respuesta devuelta por IA");
         }
-
-        return result;
     }
 }
